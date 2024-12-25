@@ -75,8 +75,13 @@ class MIDIModel:
         next_token = next_token.reshape(*shape[:-1])
         return next_token
 
-    def generate(self, prompt=None, batch_size=1, max_len=512, temp=1.0, top_p=0.98, top_k=20, generator=None):
+    def generate(self, prompt=None, batch_size=1, max_len=512, temp=1.0, top_p=0.98, top_k=20,
+                 disable_patch_change=False, disable_control_change=False, disable_channels=None, generator=None):
         tokenizer = self.tokenizer
+        if disable_channels is not None:
+            disable_channels = [tokenizer.parameter_ids["channel"][c] for c in disable_channels]
+        else:
+            disable_channels = []
         max_token_seq = tokenizer.max_token_seq
         if prompt is None:
             input_tensor = np.full((1, 1, max_token_seq), tokenizer.pad_id, dtype=np.int64)
@@ -111,13 +116,22 @@ class MIDIModel:
                             mask[b, tokenizer.pad_id] = 1
                             continue
                         if i == 0:
-                            mask[b, list(tokenizer.event_ids.values()) + [tokenizer.eos_id]] = 1
+                            mask_ids = list(tokenizer.event_ids.values()) + [tokenizer.eos_id]
+                            if disable_patch_change:
+                                mask_ids.remove(tokenizer.event_ids["patch_change"])
+                            if disable_control_change:
+                                mask_ids.remove(tokenizer.event_ids["control_change"])
+                            mask[b, mask_ids] = 1
                         else:
                             param_names = tokenizer.events[event_names[b]]
                             if i > len(param_names):
                                 mask[b, tokenizer.pad_id] = 1
                                 continue
-                            mask[b, tokenizer.parameter_ids[param_names[i - 1]]] = 1
+                            param_name = param_names[i - 1]
+                            mask_ids = tokenizer.parameter_ids[param_name]
+                            if param_name == "channel":
+                                mask_ids = [i for i in mask_ids if i not in disable_channels]
+                            mask[b, mask_ids] = 1
                     mask = np.expand_dims(mask, 1)
                     x = next_token_seq
                     logits = self.forward_token(hidden, x)[:, -1:]
