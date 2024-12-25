@@ -24,14 +24,14 @@ class MIDIModel:
         """
         hidden_state = np.expand_dims(hidden_state, (1, 2))  # (batch_size, 1, 1, n_embd)
         if x is None:
-            x = np.empty((2, 0), dtype=np.int64)
+            x = np.empty((hidden_state.shape[0], 0), dtype=np.int64)
         x = x[..., :self.tokenizer.max_token_seq - 1]
         return_indexs = x.shape[-1] + 1
         if x.shape[-1] < self.tokenizer.max_token_seq:
             x = np.pad(x, ((0, 0), (0, self.tokenizer.max_token_seq - 1 - x.shape[-1])),
                        mode="constant", constant_values=self.tokenizer.pad_id)
         x = np.expand_dims(self.net_token_emb[x], 1)
-        hidden_state = np.concatenate([hidden_state, x], axis=1)
+        hidden_state = np.concatenate([hidden_state, x], axis=2)
         logits = self.net_token.predict_on_batch(hidden_state) # TODO: replace with hef call
         return logits[:, 0, :return_indexs]
 
@@ -121,7 +121,7 @@ class MIDIModel:
                     mask = np.expand_dims(mask, 1)
                     x = next_token_seq
                     logits = self.forward_token(hidden, x)[:, -1:]
-                    scores = self.softmax(logits / temp, dim=-1) * mask
+                    scores = self.softmax(logits / temp, axis=-1) * mask
                     samples = self.sample_top_p_k(scores, top_p, top_k, generator=generator)
                     if i == 0:
                         next_token_seq = samples
