@@ -16,33 +16,36 @@ import MIDI
 from midi_model import MIDIModel
 from midi_synthesizer import MidiSynthesizer
 from midi_tokenizer import MIDITokenizerV1, MIDITokenizerV2
-import asyncio
 
 MAX_SEED = np.iinfo(np.int32).max
 
 
-async def run_subprocess():
-    # Start the subprocess
-    process = await asyncio.create_subprocess_exec(
-        "python", "bpm_measurement.py",
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
+import subprocess
+import time
 
+def run_subprocess():
+    # Start the subprocess
+    process = subprocess.Popen(
+        ["python", "bpm_measurement.py"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
     return process
 
-async def check_subprocess(process):
-    # Poll the subprocess to see if it has completed
-    return_code = process.returncode
+def check_subprocess(process):
+    # Poll the subprocess to check its status
+    return_code = process.poll()
     if return_code is not None:
         # The process has finished
-        stdout, stderr = await process.communicate()
+        stdout, stderr = process.communicate()
         print(f"Subprocess finished with return code {return_code}")
         print(f"stdout: {stdout.decode()}")
         print(f"stderr: {stderr.decode()}")
+        return stdout.decode()
     else:
         # The process is still running
         print("Subprocess is still running")
+        return None
 
 def generate(prompt=None, batch_size=1, max_len=512, temp=1.0, top_p=0.98, top_k=20,
              disable_patch_change=False, disable_control_change=False, disable_channels=None, generator=None):
@@ -69,7 +72,7 @@ def send_msgs(msgs):
     return json.dumps(msgs)
 
 
-async def run(tab, mid_seq, continuation_state, continuation_select, instruments, drum_kit, bpm, time_sig, key_sig, mid,
+def run(tab, mid_seq, continuation_state, continuation_select, instruments, drum_kit, bpm, time_sig, key_sig, mid,
         midi_events,  reduce_cc_st, remap_track_channel, add_default_instr, remove_empty_channels, seed, seed_rand,
         gen_events, temp, top_p, top_k, allow_cc):
     bpm = int(bpm)
@@ -310,7 +313,7 @@ drum_kits2number = {v: k for k, v in number2drum_kits.items()}
 key_signatures = ['C♭', 'A♭m', 'G♭', 'E♭m', 'D♭', 'B♭m', 'A♭', 'Fm', 'E♭', 'Cm', 'B♭', 'Gm', 'F', 'Dm',
                   'C', 'Am', 'G', 'Em', 'D', 'Bm', 'A', 'F♯m', 'E', 'C♯m', 'B', 'G♯m', 'F♯', 'D♯m', 'C♯', 'A♯m']
 
-async def main():
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=7860, help="gradio server port")
     parser.add_argument("--batch", type=int, default=4, help="batch size")
@@ -322,7 +325,7 @@ async def main():
     thread_pool = ThreadPoolExecutor(max_workers=OUTPUT_BATCH_SIZE)
     tokenizer: Union[MIDITokenizerV1, MIDITokenizerV2, None] = None
     model: Optional[MIDIModel] = None
-    process = await run_subprocess()
+    process = run_subprocess()
 
     load_javascript()
     app = gr.Blocks()
@@ -428,7 +431,7 @@ async def main():
                     output_midi = gr.File(label="output midi", file_types=[".mid"])
                     midi_outputs.append(output_midi)
                     audio_outputs.append(output_audio)
-        stdout, stderr = await process.communicate()
+        stdout =  check_subprocess(process)
         if stdout:
             print(f"recived bpm {stdout}")
             input_bpm = stdout
