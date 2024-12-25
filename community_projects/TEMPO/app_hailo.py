@@ -225,13 +225,19 @@ def load_model(path):
         runner_base = ClientRunner(har='/fastdata/users/dorong/tmp/midi-model/har/model_base.q.har')
         with runner_base.infer_context(InferenceContext.SDK_QUANTIZED) as ctx:
             model_base = runner_base.get_keras_model(ctx).model
-        model = MIDIModel(model_base, model_token, base_emb, token_emb)
-        tokenizer = model.tokenizer
+    if path == "hef":
+        base_emb = np.load('TEMPO_FILES/model_base_embed_tokens.npy')
+        token_emb = np.load('TEMPO_FILES/model_token_embed_tokens.npy')
+        model_token = "TEMPO_FILES/model_token.hef"
+        model_base = "TEMPO_FILES/model_base.hef"
+    model = MIDIModel(model_base, model_token, base_emb, token_emb)
+    tokenizer = model.tokenizer
+
     return "success"
 
 
 def get_model_path():
-    return gr.Dropdown(choices=["quantized_har"])
+    return gr.Dropdown(choices=["quantized_har", "hef"])
 
 
 def download(url, output_file):

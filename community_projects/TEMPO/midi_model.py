@@ -2,6 +2,14 @@ from midi_tokenizer import MIDITokenizer
 import numpy as np
 import tqdm
 
+import numpy as np
+from hailo_platform import VDevice, HailoSchedulingAlgorithm, Device
+import hailo_platform
+
+timeout_ms = 1000
+
+params = VDevice.create_params()
+params.scheduling_algorithm = HailoSchedulingAlgorithm.ROUND_ROBIN
 
 class MIDIModel:
     MAX_MIDI_SEQUENCE_LENGTH = 512
@@ -10,10 +18,26 @@ class MIDIModel:
     def __init__(self, model_base, model_token, model_base_emb, model_token_emb):
         self.tokenizer = MIDITokenizer()
         self.tokenizer.set_optimise_midi()
-        self.net = model_base
-        self.net_token = model_token
+        
+        vdevice = VDevice(params)
+        self.net = vdevice.create_infer_model(model_base)
+        for model_input in self.net.inputs:
+            model_input.set_format_type(hailo_platform.FormatType.FLOAT32)
+        for output in self.net.outputs:
+            output.set_format_type(hailo_platform.FormatType.FLOAT32)
+        self.net = self.net.configure()
+
+        self.net_token = vdevice.create_infer_model(model_token)
+        for model_input in self.net_token.inputs:
+            model_input.set_format_type(hailo_platform.FormatType.FLOAT32)
+        for output in self.net_token.outputs:
+            output.set_format_type(hailo_platform.FormatType.FLOAT32)
+        self.net_token = self.net_token.configure()
+
         self.net_emb = model_base_emb
         self.net_token_emb = model_token_emb
+        self.net_bindings = self.net.create_bindings()
+        self.net_token_bindings = self.net_token.create_bindings()
 
     def forward_token(self, hidden_state, x=None):
         """
@@ -32,7 +56,12 @@ class MIDIModel:
                        mode="constant", constant_values=self.tokenizer.pad_id)
         x = np.expand_dims(self.net_token_emb[x], 1)
         hidden_state = np.concatenate([hidden_state, x], axis=2)
-        logits = self.net_token.predict_on_batch(hidden_state) # TODO: replace with hef call
+
+        self.net_token_bindings.input().set_buffer(hidden_state)
+        self.net_token_bindings.output().set_buffer(np.empty(hidden_state.shape()))
+        self.net_token.run([self.net_token_bindings], timeout_ms)
+        logits = self.net_token_bindings.output().get_buffer()
+        
         return logits[:, 0, :return_indexs]
 
     def forward(self, x):
@@ -48,7 +77,13 @@ class MIDIModel:
         # merge token sequence
         x = self.net_emb[x]
         x = np.expand_dims(np.sum(x, axis=-2), 1)
-        hidden_state = self.net.predict_on_batch(x) # TODO: replace with hef call
+
+        shape = x.shape
+        self.net_bindings.input().set_buffer(x.reshape(-1, shape[1] * shape[2] // 8, 8, shape[-1]))
+        self.net_bindings.output().set_buffer(np.empty(x.shape))
+        self.net.run([self.net_bindings], timeout_ms)
+        hidden_state = self.net_bindings.output().get_buffer()
+        
         return hidden_state[:, 0, :return_indexs]
 
     def softmax(self, x, axis):
