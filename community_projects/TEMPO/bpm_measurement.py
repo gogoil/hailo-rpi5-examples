@@ -139,8 +139,44 @@ def calc_median_bpm(bpm_vector):
     bpm_vec = np.array(bpm_vector)
     bpm_vec = bpm_vec[bpm_vec > 60]
     bpm_vec = bpm_vec[bpm_vec < 150]
-    return np.median(bpm_vec)
+    median_bpm = np.median(bpm_vec)
+    print(f'median bpm: {median_bpm}')
+    return median_bpm
 
+def plot_fft(frequencies, fft_magnitude):    
+    # Plot the FFT magnitude vs frequency
+    plt.figure(figsize=(10, 6))
+    plt.plot(frequencies, fft_magnitude)
+    plt.title("FFT of Signal")
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Magnitude")
+    plt.grid(True)
+    plt.show()
+
+def caclulate_fft(data):
+# Compute the FFT of the signal
+    data = np.array(data)
+    # remove DC
+    data = data - np.mean(data)
+    
+    fft_signal = np.fft.fft(data)
+    frequencies = np.fft.fftfreq(len(data), 1/SAMPLE_RATE)
+    
+    # positive freqs
+    fft_magnitude = np.abs(fft_signal)[:len(data)//2]
+    frequencies = frequencies[:len(data)//2]
+
+    #plot fft
+    plot_fft(frequencies, fft_magnitude)
+    
+    #find maximun frequency
+    max_magnitude_index = 6
+    for i in range(20, 60):
+        if (fft_magnitude[max_magnitude_index] < fft_magnitude[i]):
+            max_magnitude_index = i
+    calc_bpm = 60 * frequencies[max_magnitude_index]
+    print(f'fft bpm: {calc_bpm}')
+    return calc_bpm
 
 def get_bpm():
     print("Starting Pulse Sensor BPM measurement...")
@@ -167,25 +203,16 @@ def get_bpm():
                     print(f"BPM: {bpm:.2f}")
                     start_time = time.time()
 
-
+            # return the average bpm
             if len(plot_data_vec) == SAMPLE_RATE * 20:
                 # Plot the data periodically (e.g., every second)
                 new_plot_data(plot_data_vec, plot_bpm_vec)  # Plot the raw data over the past second
                 median_bpm = calc_median_bpm(plot_bpm_vec)
-                print(f'median bpm: {median_bpm}')
-                # Compute the FFT of the signal
-                plot_data_vec = np.array(plot_data_vec)
-                plot_data_vec = plot_data_vec - np.mean(plot_data_vec)
-                fft_signal = np.fft.fft(plot_data_vec)
-                frequencies = np.fft.fftfreq(len(plot_data_vec), 1/SAMPLE_RATE)
-                fft_magnitude = np.abs(fft_signal)[:len(plot_data_vec)//2]
-                max_magnitude_index = 6
-                for i in range(6, 20):
-                    if (fft_magnitude[max_magnitude_index] < fft_magnitude[i]):
-                        max_magnitude_index = i
-                calc_bpm = 60 / frequencies[i]
-                print(f'frequency: {calc_bpm}')
-                #break
+                fft_bpm = caclulate_fft(plot_data_vec)
+                if (140 > fft_bpm > 60):
+                    print('bpm is based on fft')
+                    return fft_bpm
+                print('bpm is based on median time between peaks')
                 return median_bpm
 
             # Small delay to match sample rate
