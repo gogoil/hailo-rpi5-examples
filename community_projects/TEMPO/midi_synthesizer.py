@@ -1,6 +1,7 @@
 from threading import Lock
 
 import fluidsynth
+import numpy as np
 import struct
 
 
@@ -9,7 +10,7 @@ class MidiSynthesizer:
         self.soundfont_path = soundfont_path
         self.sample_rate = sample_rate
         self.fl = fluidsynth.Synth(samplerate=float(sample_rate))
-        self.sfid = fl.sfload(soundfont_path)
+        self.sfid = self.fl.sfload(soundfont_path)
         self.devices = [[self.fl, self.sfid, False]]
         self.devices_lock = Lock()
         self.tempo = int((60 / 120) * 10 ** 6)  # default 120 bpm
@@ -33,7 +34,7 @@ class MidiSynthesizer:
         device[0].get_samples(self.sample_rate*5) # wait for silence
         device[2] = False
 
-    def synthesis(self, midi_opus, is_first_batch):
+    def synthesis(self, midi_opus, is_first_batch, is_stream):
         event_list = []
         if is_first_batch:
             if self.curr_device:
@@ -56,6 +57,7 @@ class MidiSynthesizer:
         event_list = sorted(event_list, key=lambda e: e[1])
 
         pcm = b""
+        all_samples = np.empty((0, 2), dtype=np.int16)
         for event in event_list:
             name = event[0]
             sample_len = int(((event[1] / self.ticks_per_beat) * self.tempo / (10 ** 6)) * self.sample_rate)
@@ -63,6 +65,7 @@ class MidiSynthesizer:
             self.last_t = event[1]
             if sample_len > 0:
                 samples = self.fl.get_samples(sample_len).reshape(sample_len, 2)
+                all_samples = np.concatenate([all_samples, samples])
                 pcm += b''.join([struct.pack('<hh', sample[0], sample[1]) for sample in samples])
             if name == "set_tempo":
                 self.tempo = event[2]
@@ -78,5 +81,8 @@ class MidiSynthesizer:
             elif name == "note_off" or (name == "note_on" and event[3] == 0):
                 c, p = event[2:4]
                 self.fl.noteoff(c, p)
+        if is_stream:
+            return pcm
+        else:
+            return all_samples
 
-        return pcm
