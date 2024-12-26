@@ -216,10 +216,10 @@ def main():
     while True:
         bpm = bpm_measurement.get_bpm()
         instruments, drum_set = get_instruments(bpm)
-        output_midi_seq, continuation_state, input_seed = run(model, tokenizer, tab, None, continuation_state, 0, instruments, drum_set, bpm, "auto", 0, None, None,  None, None, None, None, None, True, 256, 1.0, 0.94, 20, True)
+        output_midi_seq, continuation_state, input_seed = run(model, tokenizer, tab, None, continuation_state, 0, instruments, drum_set, bpm, "auto", 0, None, None,  None, None, None, None, None, True, 128, 1.0, 0.94, 20, True)
         midi_outputs = finish_run(output_midi_seq, tokenizer)
         audio_outputs = render_audio(output_midi_seq, True, tokenizer, thread_pool, synthesizer)
-        tab = 2
+        tab = 0
         path = generate_wav(audio_outputs)
         play_wav(path)
 
