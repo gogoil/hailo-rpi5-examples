@@ -191,7 +191,7 @@ def render_audio(mid_seq, should_render_audio):
     audio_futures = []
     for i in range(OUTPUT_BATCH_SIZE):
         mid = tokenizer.detokenize(mid_seq[i])
-        audio_future = thread_pool.submit(synthesis_task, mid, is_first_batch)
+        audio_future = thread_pool.submit(synthesis_task, mid, is_first_batch=True)
         audio_futures.append(audio_future)
     for future in audio_futures:
         outputs.append((44100, future.result()))
