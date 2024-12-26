@@ -14,6 +14,7 @@ class MidiSynthesizer:
         self.devices_lock = Lock()
         self.tempo = int((60 / 120) * 10 ** 6)  # default 120 bpm
         self.ticks_per_beat = 480
+        self.curr_device = None
 
     def get_fluidsynth(self):
         with self.devices_lock:
