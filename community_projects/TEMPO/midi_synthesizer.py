@@ -12,6 +12,8 @@ class MidiSynthesizer:
         sfid = fl.sfload(soundfont_path)
         self.devices = [[fl, sfid, False]]
         self.devices_lock = Lock()
+        self.tempo = int((60 / 120) * 10 ** 6)  # default 120 bpm
+        self.ticks_per_beat = 480
 
     def get_fluidsynth(self):
         with self.devices_lock:
@@ -31,40 +33,31 @@ class MidiSynthesizer:
         device[2] = False
 
     def synthesis(self, midi_opus, is_first_batch):
+        event_list = []
         if is_first_batch:
+            self.release_fluidsynth(self.curr_device)
             self.ticks_per_beat = midi_opus[0]
-            event_list = []
-            for track in midi_opus[1:]:
-                abs_t = 0
-                for event in track:
-                    abs_t += event[1]
-                    event_new = [*event]
-                    event_new[1] = abs_t
-                    event_list.append(event_new)
-            event_list = sorted(event_list, key=lambda e: e[1])
+            midi_opus = midi_opus[1:]
 
-            device = self.get_fluidsynth()
-            self.fl, self.sfid = device[:-1]
-            self.tempo = int((60 / 120) * 10 ** 6)  # default 120 bpm
+            self.curr_device = self.get_fluidsynth()
+            self.fl, self.sfid = self.curr_device[:-1]
             self.last_t = 0
             for c in range(16):
                 self.fl.program_select(c, self.sfid, 128 if c == 9 else 0, 0)
-        else:
-            event_list = []
-            for track in midi_opus:
-                abs_t = 0
-                for event in track:
-                    abs_t += event[1]
-                    event_new = [*event]
-                    event_new[1] = abs_t
-                    event_list.append(event_new)
-            event_list = sorted(event_list, key=lambda e: e[1])
+        for track in midi_opus:
+            abs_t = 0
+            for event in track:
+                abs_t += event[1]
+                event_new = [*event]
+                event_new[1] = abs_t
+                event_list.append(event_new)
+        event_list = sorted(event_list, key=lambda e: e[1])
 
         pcm = b""
         for event in event_list:
             name = event[0]
-            sample_len = int(((event[1] / self.ticks_per_beat) * tempo / (10 ** 6)) * self.sample_rate)
-            sample_len -= int(((last_t / self.ticks_per_beat) * tempo / (10 ** 6)) * self.sample_rate)
+            sample_len = int(((event[1] / self.ticks_per_beat) * self.tempo / (10 ** 6)) * self.sample_rate)
+            sample_len -= int(((last_t / self.ticks_per_beat) * self.tempo / (10 ** 6)) * self.sample_rate)
             last_t = event[1]
             if sample_len > 0:
                 samples = self.fl.get_samples(sample_len).reshape(sample_len, 2)
@@ -84,5 +77,4 @@ class MidiSynthesizer:
                 c, p = event[2:4]
                 self.fl.noteoff(c, p)
 
-        self.release_fluidsynth(device)
         return pcm
