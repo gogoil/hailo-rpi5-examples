@@ -3,6 +3,9 @@ TEMPO
 
 Song generation based on heart rate. The code generates music according to your hear rate. 
 
+![Pipeline](https://i.imgur.com/VhYneIl.png)
+
+
 Based on the work of SkyTNT Midi-Model: https://github.com/SkyTNT/midi-model
 
 [![VIDEO](https://img.youtube.com/vi/QWA-di5EQcc/1.jpg)](https://www.youtube.com/watch?v=QWA-di5EQcc)
