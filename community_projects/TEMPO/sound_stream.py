@@ -58,6 +58,7 @@ def generate_wav(pcm_data, path=None, sample_rate=44100):
         wav_file.setsampwidth(2)  # 2 bytes per sample (16-bit)
         wav_file.setframerate(sample_rate)  # Sample rate (44.1 kHz)
         wav_file.writeframes(pcm_data)
+    return path
 
 def play_wav(path):
     subprocess.run(["mplayer", "-ao", "pulse", path])

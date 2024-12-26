@@ -11,6 +11,7 @@ import tqdm
 import MIDI
 from midi_model import MIDIModel
 from midi_synthesizer import MidiSynthesizer
+from sound_stream import generate_wav, play_wav
 
 MAX_SEED = np.iinfo(np.int32).max
 OUTPUT_BATCH_SIZE = 1
@@ -134,7 +135,7 @@ def finish_run(mid_seq, tokenizer):
 
 
 def synthesis_task(mid, synthesizer, is_first_batch):
-    return synthesizer.synthesis(MIDI.score2opus(mid), is_first_batch, is_stream=False)
+    return synthesizer.synthesis(MIDI.score2opus(mid), is_first_batch, is_stream=True)
 
 
 def render_audio(mid_seq, should_render_audio, tokenizer, thread_pool, synthesizer):
@@ -150,7 +151,7 @@ def render_audio(mid_seq, should_render_audio, tokenizer, thread_pool, synthesiz
         audio_future = thread_pool.submit(synthesis_task, mid, synthesizer, is_first_batch=True)
         audio_futures.append(audio_future)
     for future in audio_futures:
-        outputs.append((44100, future.result()))
+        outputs.append(future.result())
     if OUTPUT_BATCH_SIZE == 1:
         return outputs[0]
     return tuple(outputs)
@@ -218,6 +219,8 @@ def main():
         midi_outputs = finish_run(output_midi_seq, tokenizer)
         audio_outputs = render_audio(output_midi_seq, True, tokenizer, thread_pool, synthesizer)
         tab = 2
+        path = generate_wav(audio_outputs)
+        play_wav(path)
 
 
 if __name__ == '__main__':
