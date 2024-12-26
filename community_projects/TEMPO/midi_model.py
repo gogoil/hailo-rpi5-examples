@@ -3,7 +3,7 @@ import numpy as np
 import tqdm
  
 import numpy as np
-from hailo_platform import VDevice, HailoSchedulingAlgorithm, Device, ConfigureParams, HailoStreamInterface, InputVStreamParams, OutputVStreamParams, FormatType, InferVStreams
+from hailo_platform import VDevice, HailoSchedulingAlgorithm, Device, ConfigureParams, HailoStreamInterface, InputVStreamParams, OutputVStreamParams, FormatType, InferVStreams, HEF
 import hailo_platform
  
 timeout_ms = 1000
@@ -22,9 +22,12 @@ class MIDIModel:
         params.multi_process_service=False
         self.vdevice = VDevice(params)
  
-        configure_params = ConfigureParams.create_from_hef(model_base, interface=HailoStreamInterface.INTEGRATED)
-        configure_params["model_base"].batch_size = 1
-        configure_token_params = ConfigureParams.create_from_hef(model_token, interface=HailoStreamInterface.INTEGRATED)
+        model_base = HEF(model_base)
+        model_token = HEF(model_token)
+ 
+        configure_params = ConfigureParams.create_from_hef(model_base, interface=HailoStreamInterface.PCIe)
+        configure_params["new"].batch_size = 1
+        configure_token_params = ConfigureParams.create_from_hef(model_token, interface=HailoStreamInterface.PCIe)
         configure_token_params["model_token"].batch_size = 1
  
         self.net = self.vdevice.configure(model_base, configure_params)[0]
@@ -58,7 +61,7 @@ class MIDIModel:
                        mode="constant", constant_values=self.tokenizer.pad_id)
         x = np.expand_dims(self.net_token_emb[x], 1)
         hidden_state = np.concatenate([hidden_state, x], axis=2)
-        logits = infer_pipeline_token.infer(hidden_state)        
+        logits = infer_pipeline_token.infer(hidden_state)['model_token/conv16']
         return logits[:, 0, :return_indexs]
  
     def forward(self, infer_pipeline, x):
@@ -77,7 +80,7 @@ class MIDIModel:
  
         shape = x.shape
         x = x.reshape(-1, shape[1] * shape[2] // 8, 8, shape[-1])
-        hidden_state = infer_pipeline.infer(x)
+        hidden_state = infer_pipeline.infer(x)['model_base/mul_and_add49']
        
         return hidden_state[:, 0, :return_indexs]
  
