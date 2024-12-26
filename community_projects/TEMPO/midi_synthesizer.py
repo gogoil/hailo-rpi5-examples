@@ -12,6 +12,8 @@ class MidiSynthesizer:
         sfid = fl.sfload(soundfont_path)
         self.devices = [[fl, sfid, False]]
         self.devices_lock = Lock()
+        self.tempo = int((60 / 120) * 10 ** 6)  # default 120 bpm
+        self.ticks_per_beat = 480
 
     def get_fluidsynth(self):
         with self.devices_lock:
@@ -30,10 +32,19 @@ class MidiSynthesizer:
         device[0].get_samples(self.sample_rate*5) # wait for silence
         device[2] = False
 
-    def synthesis(self, midi_opus):
-        ticks_per_beat = midi_opus[0]
+    def synthesis(self, midi_opus, is_first_batch):
         event_list = []
-        for track_idx, track in enumerate(midi_opus[1:]):
+        if is_first_batch:
+            self.release_fluidsynth(self.curr_device)
+            self.ticks_per_beat = midi_opus[0]
+            midi_opus = midi_opus[1:]
+
+            self.curr_device = self.get_fluidsynth()
+            self.fl, self.sfid = self.curr_device[:-1]
+            self.last_t = 0
+            for c in range(16):
+                self.fl.program_select(c, self.sfid, 128 if c == 9 else 0, 0)
+        for track in midi_opus:
             abs_t = 0
             for event in track:
                 abs_t += event[1]
@@ -42,35 +53,28 @@ class MidiSynthesizer:
                 event_list.append(event_new)
         event_list = sorted(event_list, key=lambda e: e[1])
 
-        tempo = int((60 / 120) * 10 ** 6)  # default 120 bpm
         pcm = b""
-        device = self.get_fluidsynth()
-        fl, sfid = device[:-1]
-        last_t = 0
-        for c in range(16):
-            fl.program_select(c, sfid, 128 if c == 9 else 0, 0)
         for event in event_list:
             name = event[0]
-            sample_len = int(((event[1] / ticks_per_beat) * tempo / (10 ** 6)) * self.sample_rate)
-            sample_len -= int(((last_t / ticks_per_beat) * tempo / (10 ** 6)) * self.sample_rate)
+            sample_len = int(((event[1] / self.ticks_per_beat) * self.tempo / (10 ** 6)) * self.sample_rate)
+            sample_len -= int(((last_t / self.ticks_per_beat) * self.tempo / (10 ** 6)) * self.sample_rate)
             last_t = event[1]
             if sample_len > 0:
-                samples = fl.get_samples(sample_len).reshape(sample_len, 2)
+                samples = self.fl.get_samples(sample_len).reshape(sample_len, 2)
                 pcm += b''.join([struct.pack('<hh', sample[0], sample[1]) for sample in samples])
             if name == "set_tempo":
                 tempo = event[2]
             elif name == "patch_change":
                 c, p = event[2:4]
-                fl.program_select(c, sfid, 128 if c == 9 else 0, p)
+                self.fl.program_select(c, self.sfid, 128 if c == 9 else 0, p)
             elif name == "control_change":
                 c, cc, v = event[2:5]
-                fl.cc(c, cc, v)
+                self.fl.cc(c, cc, v)
             elif name == "note_on" and event[3] > 0:
                 c, p, v = event[2:5]
-                fl.noteon(c, p, v)
+                self.fl.noteon(c, p, v)
             elif name == "note_off" or (name == "note_on" and event[3] == 0):
                 c, p = event[2:4]
-                fl.noteoff(c, p)
+                self.fl.noteoff(c, p)
 
-        self.release_fluidsynth(device)
         return pcm
