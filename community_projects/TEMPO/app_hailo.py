@@ -10,6 +10,7 @@ from typing import Union, Optional
 import gradio as gr
 import numpy as np
 import requests
+import struct
 import tqdm
 
 import MIDI
@@ -130,10 +131,10 @@ def run(tab, mid_seq, continuation_state, continuation_select, instruments, drum
             init_msgs += [create_msg("visualizer_clear", [i, tokenizer.version]),
                           create_msg("visualizer_append", [i, events])]
     yield mid_seq, continuation_state, seed, send_msgs(init_msgs)
-    midi_generator = generate(mid, batch_size=OUTPUT_BATCH_SIZE, max_len=max_len, temp=temp,
-                              top_p=top_p, top_k=top_k, disable_patch_change=disable_patch_change,
-                              disable_control_change=not allow_cc, disable_channels=disable_channels,
-                              generator=generator)
+    midi_generator = model.generate(mid, batch_size=OUTPUT_BATCH_SIZE, max_len=max_len, temp=temp,
+                                    top_p=top_p, top_k=top_k, disable_patch_change=disable_patch_change,
+                                    disable_control_change=not allow_cc, disable_channels=disable_channels,
+                                    generator=generator)
     events = [list() for i in range(OUTPUT_BATCH_SIZE)]
     t = time.time()
     for i, token_seqs in enumerate(midi_generator):
@@ -172,8 +173,12 @@ def finish_run(mid_seq):
     return *outputs, send_msgs(end_msgs)
 
 
-def synthesis_task(mid):
-    return synthesizer.synthesis(MIDI.score2opus(mid))
+def synthesis_task(mid, is_first_batch):
+    pcm = synthesizer.synthesis(MIDI.score2opus(mid), is_first_batch)
+    samples = np.empty((0, 2), dtype=np.int16)
+    for i in range(0, len(pcm), 4):
+        samples = np.concatenate([samples, np.array(struct.unpack('<hh', pcm[i:i+4]))])
+    return samples
 
 
 def render_audio(mid_seq, should_render_audio):
@@ -186,7 +191,7 @@ def render_audio(mid_seq, should_render_audio):
     audio_futures = []
     for i in range(OUTPUT_BATCH_SIZE):
         mid = tokenizer.detokenize(mid_seq[i])
-        audio_future = thread_pool.submit(synthesis_task, mid)
+        audio_future = thread_pool.submit(synthesis_task, mid, is_first_batch=True)
         audio_futures.append(audio_future)
     for future in audio_futures:
         outputs.append((44100, future.result()))
@@ -212,26 +217,22 @@ def undo_continuation(mid_seq, continuation_state):
     return mid_seq, continuation_state, send_msgs(end_msgs)
 
 
-def load_model(path):
+def load_model():
     global model, tokenizer
-    if path == "quantized_har":
-        base_emb = np.load('/fastdata/users/dorong/tmp/midi-model/model_base_embed_tokens.npy')
-        token_emb = np.load('/fastdata/users/dorong/tmp/midi-model/model_token_embed_tokens.npy')
-        from hailo_sdk_client.runner.client_runner import ClientRunner
-        from hailo_sdk_client.exposed_definitions import InferenceContext
-        runner_token = ClientRunner(har='/fastdata/users/dorong/tmp/midi-model/har/model_token.q.har')
-        with runner_token.infer_context(InferenceContext.SDK_QUANTIZED) as ctx:
-            model_token = runner_token.get_keras_model(ctx).model
-        runner_base = ClientRunner(har='/fastdata/users/dorong/tmp/midi-model/har/model_base.q.har')
-        with runner_base.infer_context(InferenceContext.SDK_QUANTIZED) as ctx:
-            model_base = runner_base.get_keras_model(ctx).model
+    model_path_dir = "TEMPO_FILES"
+    if not os.path.exists(model_path_dir):
+        return "Model not found. Make sure to run ./download_files.sh first."
+    try:
+        base_emb = os.path.join(model_path_dir, "model_base_embed_tokens.npy")
+        token_emb = os.path.join(model_path_dir, "model_token_embed_tokens.npy")
+        model_token = os.path.join(model_path_dir, "model_token.hef")
+        model_base = os.path.join(model_path_dir, "model_base.hef")
         model = MIDIModel(model_base, model_token, base_emb, token_emb)
         tokenizer = model.tokenizer
+    except Exception as e:
+        print(f"Failed to load model")
+        return e
     return "success"
-
-
-def get_model_path():
-    return gr.Dropdown(choices=["quantized_har"])
 
 
 def download(url, output_file):
@@ -312,13 +313,10 @@ if __name__ == "__main__":
                 }
                 """)
         with gr.Accordion(label="Model option", open=True):
-            load_model_path_btn = gr.Button("Get Models")
-            model_path_input = gr.Dropdown(label="model")
-            load_model_path_btn.click(get_model_path, [], model_path_input)
-            load_model_btn = gr.Button("Load")
+            load_model_btn = gr.Button("Load Model")
             model_msg = gr.Textbox()
             load_model_btn.click(
-                load_model, [model_path_input], model_msg
+                load_model, [], model_msg
             )
         tab_select = gr.State(value=0)
         with gr.Tabs():
