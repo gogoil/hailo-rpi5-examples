@@ -5,7 +5,7 @@ Song generation based on heart rate. The code generates music according to your 
 
 Based on the work of SkyTNT Midi-Model: https://github.com/SkyTNT/midi-model
 
-https://youtu.be/QWA-di5EQcc
+[![VIDEO](https://img.youtube.com/vi/QWA-di5EQcc/1.jpg)](https://www.youtube.com/watch?v=QWA-di5EQcc)
 
 Requirements
 ------------
