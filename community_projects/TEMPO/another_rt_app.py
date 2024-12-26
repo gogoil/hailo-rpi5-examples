@@ -63,7 +63,7 @@ def run(tab, mid_seq, continuation_state, continuation_select, instruments, drum
     bpm = bpm_measurement.get_bpm()
     print(f"bpm was recived {bpm}")
     bpm = int(bpm)
-    instruments, drum_kit = get_instruments(bpm)
+    instruments2, drum_kit2 = get_instruments(bpm)
     if time_sig == "auto":
         time_sig = None
         time_sig_nn = 4
@@ -99,18 +99,18 @@ def run(tab, mid_seq, continuation_state, continuation_select, instruments, drum
         if bpm != 0:
             mid.append(tokenizer.event2tokens(["set_tempo", 0, 0, 0, bpm]))
         patches = {}
-        if instruments is None:
-            instruments = []
-        for instr in instruments:
+        if instruments2 is None:
+            instruments2 = []
+        for instr in instruments2:
             patches[i] = patch2number[instr]
             i = (i + 1) if i != 8 else 10
-        if drum_kit != "None":
-            patches[9] = drum_kits2number[drum_kit]
+        if drum_kit2 != "None":
+            patches[9] = drum_kits2number[drum_kit2]
         for i, (c, p) in enumerate(patches.items()):
             mid.append(tokenizer.event2tokens(["patch_change", 0, 0, i + 1, c, p]))
         mid = np.asarray([mid] * OUTPUT_BATCH_SIZE, dtype=np.int64)
         mid_seq = mid.tolist()
-        if len(instruments) > 0:
+        if len(instruments2) > 0:
             disable_patch_change = True
             disable_channels = [i for i in range(16) if i not in patches]
     elif tab == 1 and mid is not None:
