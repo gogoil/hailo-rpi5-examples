@@ -131,10 +131,10 @@ def run(tab, mid_seq, continuation_state, continuation_select, instruments, drum
             init_msgs += [create_msg("visualizer_clear", [i, tokenizer.version]),
                           create_msg("visualizer_append", [i, events])]
     yield mid_seq, continuation_state, seed, send_msgs(init_msgs)
-    midi_generator = generate(mid, batch_size=OUTPUT_BATCH_SIZE, max_len=max_len, temp=temp,
-                              top_p=top_p, top_k=top_k, disable_patch_change=disable_patch_change,
-                              disable_control_change=not allow_cc, disable_channels=disable_channels,
-                              generator=generator)
+    midi_generator = model.generate(mid, batch_size=OUTPUT_BATCH_SIZE, max_len=max_len, temp=temp,
+                                    top_p=top_p, top_k=top_k, disable_patch_change=disable_patch_change,
+                                    disable_control_change=not allow_cc, disable_channels=disable_channels,
+                                    generator=generator)
     events = [list() for i in range(OUTPUT_BATCH_SIZE)]
     t = time.time()
     for i, token_seqs in enumerate(midi_generator):

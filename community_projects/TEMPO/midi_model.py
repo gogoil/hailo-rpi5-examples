@@ -1,56 +1,67 @@
 from midi_tokenizer import MIDITokenizer
+
 import numpy as np
 import tqdm
- 
-import numpy as np
-from hailo_platform import VDevice, HailoSchedulingAlgorithm, Device, ConfigureParams, HailoStreamInterface, InputVStreamParams, OutputVStreamParams, FormatType, InferVStreams, HEF
-import hailo_platform
- 
+
+from hailo_platform import (
+    ConfigureParams,
+    FormatType,
+    HailoSchedulingAlgorithm,
+    HailoStreamInterface,
+    HEF,
+    InferVStreams,
+    InputVStreamParams,
+    OutputVStreamParams,
+    VDevice, 
+)
+
 timeout_ms = 1000
- 
- 
+
+
 class MIDIModel:
     MAX_MIDI_SEQUENCE_LENGTH = 512
- 
- 
+
+
     def __init__(self, model_base, model_token, model_base_emb, model_token_emb):
+        # Currently only support tv2o-medium model.
         self.tokenizer = MIDITokenizer()
         self.tokenizer.set_optimise_midi()
-       
+
+        self.net_emb = model_base_emb
+        self.net_token_emb = model_token_emb
+        
+        self._init_hefs(model_base, model_token)
+
+    def _init_hefs(self, model_base, model_token):
         params = VDevice.create_params()
         params.scheduling_algorithm = HailoSchedulingAlgorithm.ROUND_ROBIN
         params.multi_process_service=False
         self.vdevice = VDevice(params)
- 
+
         model_base = HEF(model_base)
         model_token = HEF(model_token)
- 
+
         configure_params = ConfigureParams.create_from_hef(model_base, interface=HailoStreamInterface.PCIe)
-        configure_params["new"].batch_size = 1
         configure_token_params = ConfigureParams.create_from_hef(model_token, interface=HailoStreamInterface.PCIe)
-        configure_token_params["model_token"].batch_size = 1
- 
+
         self.net = self.vdevice.configure(model_base, configure_params)[0]
         self.net_token = self.vdevice.configure(model_token, configure_token_params)[0]
- 
+
         self.input_vstreams_params = InputVStreamParams.make(self.net, format_type=FormatType.FLOAT32)
         self.input_vstreams_params["model_base/input_layer1"].user_buffer_format.type = FormatType.FLOAT32
         self.output_vstreams_params = OutputVStreamParams.make(self.net, format_type=FormatType.FLOAT32)
- 
+
         self.input_vstreams_token_params = InputVStreamParams.make(self.net_token, format_type=FormatType.FLOAT32)
         self.input_vstreams_token_params["model_token/input_layer1"].user_buffer_format.type = FormatType.FLOAT32
         self.output_vstreams_token_params = OutputVStreamParams.make(self.net_token, format_type=FormatType.FLOAT32)
- 
-        self.net_emb = model_base_emb
-        self.net_token_emb = model_token_emb
- 
+
     def forward_token(self, infer_pipeline_token, hidden_state, x=None):
         """
- 
         :param hidden_state: (batch_size, n_embd)
         :param x: (batch_size, token_sequence_length)
         :return: (batch_size, 1 + token_sequence_length, vocab_size)
         """
+        # concat hidden state with token sequence
         hidden_state = np.expand_dims(hidden_state, (1, 2))  # (batch_size, 1, 1, n_embd)
         if x is None:
             x = np.empty((hidden_state.shape[0], 0), dtype=np.int64)
@@ -61,15 +72,17 @@ class MIDIModel:
                        mode="constant", constant_values=self.tokenizer.pad_id)
         x = np.expand_dims(self.net_token_emb[x], 1)
         hidden_state = np.concatenate([hidden_state, x], axis=2)
-        logits = infer_pipeline_token.infer(hidden_state)['model_token/conv16']
+
+        logits = infer_pipeline_token.infer(hidden_state)
+        logits = list(logits.values())[0]
         return logits[:, 0, :return_indexs]
- 
+
     def forward(self, infer_pipeline, x):
         """
         :param x: (batch_size, midi_sequence_length, token_sequence_length)
         :return: hidden (batch_size, midi_sequence_length, n_embd)
         """
-        x = x[:, :self.MAX_MIDI_SEQUENCE_LENGTH]
+        x = x[:, -self.MAX_MIDI_SEQUENCE_LENGTH:]
         return_indexs = x.shape[1]
         if x.shape[1] < self.MAX_MIDI_SEQUENCE_LENGTH:
             x = np.pad(x, ((0, 0), (0, self.MAX_MIDI_SEQUENCE_LENGTH - x.shape[1]), (0, 0)),
@@ -77,18 +90,17 @@ class MIDIModel:
         # merge token sequence
         x = self.net_emb[x]
         x = np.expand_dims(np.sum(x, axis=-2), 1)
- 
-        shape = x.shape
-        x = x.reshape(-1, shape[1] * shape[2] // 8, 8, shape[-1])
-        hidden_state = infer_pipeline.infer(x)['model_base/mul_and_add49']
-       
+
+        x = x.reshape(-1, x.shape[1] * x.shape[2] // 8, 8, x.shape[-1])
+        hidden_state = infer_pipeline.infer(x)
+        hidden_state = list(hidden_state.values())[0]
         return hidden_state[:, 0, :return_indexs]
- 
+
     def softmax(self, x, axis):
         x_max = np.amax(x, axis=axis, keepdims=True)
         exp_x_shifted = np.exp(x - x_max)
         return exp_x_shifted / np.sum(exp_x_shifted, axis=axis, keepdims=True)
- 
+
     def sample_top_p_k(self, probs, p, k, generator=None):
         if generator is None:
             generator = np.random
@@ -107,7 +119,7 @@ class MIDIModel:
         next_token = np.stack([generator.choice(idxs, p=pvals) for pvals, idxs in zip(probs_sort_flat, probs_idx_flat)])
         next_token = next_token.reshape(*shape[:-1])
         return next_token
- 
+
     def generate(self, prompt=None, batch_size=1, max_len=512, temp=1.0, top_p=0.98, top_k=20,
                  disable_patch_change=False, disable_control_change=False, disable_channels=None, generator=None):
         with InferVStreams(self.net, self.input_vstreams_params, self.output_vstreams_params) as infer_pipeline:
@@ -135,7 +147,7 @@ class MIDIModel:
                         prompt = np.pad(prompt, ((0, 0), (0, 0), (0, max_token_seq - prompt.shape[-1])),
                                         mode="constant", constant_values=tokenizer.pad_id)
                     input_tensor = prompt
- 
+
                 cur_len = input_tensor.shape[1]
                 bar = tqdm.tqdm(desc="generating", total=max_len - cur_len)
                 with bar:
