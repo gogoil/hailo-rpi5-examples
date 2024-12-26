@@ -1,20 +1,18 @@
 TEMPO
 ================================================================
 
-Song generation based on heart rate
-
-![Output example](./output.gif?raw=true)
+Song generation based on heart rate. The code generates music according to your hear rate. 
 
 Requirements
 ------------
 
-- install [fluidsynth](https://www.fluidsynth.org/)>=2.0.0
-- `pip install -r requirements.txt`
+The packages are described in the requirements (additionally to the requirements of the whole repo)
 
-Supported Models
-----------------
+Run Options
+-----------
+You can run either with a heart monitor which will choose tge initial BPM in the generation or by choosing the generation manually. 
 
-Usage
+Setup
 -----
 
 1. Setup virtual environment
@@ -23,30 +21,45 @@ Usage
     - `pip install -r requirements.txt`
     - `sudo chmod 777 download_files.sh`
     - `./download_files.sh`
-  
-2. Run the web application
-    - run `python app_hailo.py`
 
-3. 
+2. Hardware Setup (for using heart monitor)
+    2.1 Hardware Requirements:
+        - Heart monitor - https://pulsesensor.com/
+        - A2D - part number ADS1115
+        - Jumpers to connect raspberry header to the sensor.
+    2.2 Hardware Connections:
+        2.2.1 Connect the hear monitor to the analog input A0 of the A2D.
+            - Prepare the sensor according to the official site - https://cdn.shopify.com/s/files/1/0100/6632/files/PulseSensor_Datasheet_2024-Nov.pdf?v=1732032216
+            - Connect red wire to 3.3V pin of A2D.
+            - Connect black wire to ground pin of A2D.
+            - Connect purple wire to A0 pin of A2D.
+        2.2.2 Conect the A2D to the raspberry pi in the correct GPIO of I2C0. 
+            - Image of pinout is availiable at https://community.element14.com/products/raspberry-pi/m/files/148385
+            - Pin1 is 3.3V of the A2D.
+            - Pin3 is SDA.
+            - Pin 5 is SCL.
+            - Pin 6 is Ground.
+    2.3 Put the heart monitor on the your finger using the velcro tape provided in you purchase (see 2.2.1). 
+        The tape should be strong enough to not fall from the finger but not too strong for a reliable read as the monitor uses the light reflection coming from the veins. 
 
+Running the program
+-------------------
 
-For more information:
-```shell script
-./detection_with_tracker.py -h
-```
-Example 
--------
-**Command**
-```shell script
-./detection_with_tracker.py -i input_video.mp4 -o output_video.mp4 -l coco.txt -s 0.5
-```
+1. Run the web application(not using heart monitor):
+    - run `python app_hailo.py --port 8080 --batch 1`
+
+2. Run using heart monitor:
+    - run 'python another_rt_app.py --port 8080 --batch 1'
+
+After the web ui opens click "generate". This will load the hef file which is located in a google drive folder. 
+When runnning the manual version you can control all the sliders.
+When running with the heart monitor, the BPM is determined by the hear monitor measured.
 
 Additional Notes
 ----------------
 
-- The example was only tested with ``HailoRT v4.18.0``
-- The example expects a HEF which contains the HailoRT Postprocess
-- The script assumes that the input video is in a standard format supported by OpenCV (e.g., .mp4, .avi).
+- On the heart monitor application, BPM measurements are printed for about 20 seconds, you can ignore them as the final result will be calculated on the whole 20 seconds. 
+- If the heart monitor is not put correctly the BPM will be 0 for all measurements and the program will not work. 
 
 Disclaimer
 ----------
