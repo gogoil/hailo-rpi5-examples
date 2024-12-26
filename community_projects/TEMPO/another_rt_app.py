@@ -22,32 +22,6 @@ from midi_tokenizer import MIDITokenizerV1, MIDITokenizerV2
 
 MAX_SEED = np.iinfo(np.int32).max
 
-def run_subprocess():
-    # Start the subprocess, calling the bpm_measurement.py script's main function
-    process = subprocess.Popen(
-        ["python", "-c", "import bpm_measurement; print(bpm_measurement.main())"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True  # Ensures output is returned as strings
-    )
-    return process
-
-def check_subprocess(process):
-    # Poll the subprocess to check its status
-    return_code = process.poll()
-    if return_code is not None:
-        # The process has finished
-        stdout, stderr = process.communicate()
-        print(f"Subprocess finished with return code {return_code}")
-        print(f"stdout: {stdout}")
-        print(f"stderr: {stderr}")
-        # Parse and return the result from stdout
-        return stdout.strip()  # Assuming the result is on a single line
-    else:
-        # The process is still running
-        print("Subprocess is still running")
-        return None
-
 
 def generate(prompt=None, batch_size=1, max_len=512, temp=1.0, top_p=0.98, top_k=20,
              disable_patch_change=False, disable_control_change=False, disable_channels=None, generator=None):
@@ -74,12 +48,22 @@ def send_msgs(msgs):
     return json.dumps(msgs)
 
 
+def get_instruments(bpm):
+    if bpm <= 80:
+        return None, "None"
+    elif bpm <= 100:
+        return ['Acoustic Grand', 'SynthStrings 2', 'SynthStrings 1', 'Pizzicato Strings', 'Pad 2 (warm)', 'Tremolo Strings', 'String Ensemble 1'], "Orchestra"
+    elif bpm <= 120:
+        return None, "None"
+    return None, "None"
+
 def run(tab, mid_seq, continuation_state, continuation_select, instruments, drum_kit, bpm, time_sig, key_sig, mid,
         midi_events,  reduce_cc_st, remap_track_channel, add_default_instr, remove_empty_channels, seed, seed_rand,
         gen_events, temp, top_p, top_k, allow_cc):
     bpm = bpm_measurement.get_bpm()
     print(f"bpm was recived {bpm}")
     bpm = int(bpm)
+    instruments, drum_kit = get_instruments(bpm)
     if time_sig == "auto":
         time_sig = None
         time_sig_nn = 4
@@ -353,13 +337,13 @@ if __name__ == "__main__":
         tab_select = gr.State(value=0)
         with gr.Tabs():
             with gr.TabItem("custom prompt") as tab1:
-                input_instruments = gr.Dropdown(label="🪗instruments (auto if empty)", choices=list(patch2number.keys()),
+                input_instruments = gr.Dropdown(label="🪗instruments (auto)", choices=list(),
                                                 multiselect=True, max_choices=15, type="value")
-                input_drum_kit = gr.Dropdown(label="🥁drum kit", choices=list(drum_kits2number.keys()), type="value",
+                input_drum_kit = gr.Dropdown(label="🥁drum kit (auto)", choices=list(), type="value",
                                              value="None")
-                # input_bpm = gr.Slider(label="BPM (beats are overridden by sensor)", minimum=0, maximum=255,
-                #                       step=1,
-                #                       value=0)
+                input_bpm = gr.Slider(label="BPM (beats are overridden by sensor)", minimum=0, maximum=255,
+                                      step=1,
+                                      value=0)
                 input_time_sig = gr.Radio(label="time signature (only for tv2 models)",
                                           value="auto",
                                           choices=["auto", "4/4", "2/4", "3/4", "6/4", "7/4",
@@ -370,20 +354,20 @@ if __name__ == "__main__":
                                          choices=["auto"] + key_signatures,
                                          type="index"
                                          )
-                example1 = gr.Examples([
-                    [[], "None"],
-                    [["Acoustic Grand"], "None"],
-                    [['Acoustic Grand', 'SynthStrings 2', 'SynthStrings 1', 'Pizzicato Strings',
-                      'Pad 2 (warm)', 'Tremolo Strings', 'String Ensemble 1'], "Orchestra"],
-                    [['Trumpet', 'Oboe', 'Trombone', 'String Ensemble 1', 'Clarinet',
-                      'French Horn', 'Pad 4 (choir)', 'Bassoon', 'Flute'], "None"],
-                    [['Flute', 'French Horn', 'Clarinet', 'String Ensemble 2', 'English Horn', 'Bassoon',
-                      'Oboe', 'Pizzicato Strings'], "Orchestra"],
-                    [['Electric Piano 2', 'Lead 5 (charang)', 'Electric Bass(pick)', 'Lead 2 (sawtooth)',
-                      'Pad 1 (new age)', 'Orchestra Hit', 'Cello', 'Electric Guitar(clean)'], "Standard"],
-                    [["Electric Guitar(clean)", "Electric Guitar(muted)", "Overdriven Guitar", "Distortion Guitar",
-                      "Electric Bass(finger)"], "Standard"]
-                ], [input_instruments, input_drum_kit])
+                # example1 = gr.Examples([
+                #     [[], "None"],
+                #     [["Acoustic Grand"], "None"],
+                #     [['Acoustic Grand', 'SynthStrings 2', 'SynthStrings 1', 'Pizzicato Strings',
+                #       'Pad 2 (warm)', 'Tremolo Strings', 'String Ensemble 1'], "Orchestra"],
+                #     [['Trumpet', 'Oboe', 'Trombone', 'String Ensemble 1', 'Clarinet',
+                #       'French Horn', 'Pad 4 (choir)', 'Bassoon', 'Flute'], "None"],
+                #     [['Flute', 'French Horn', 'Clarinet', 'String Ensemble 2', 'English Horn', 'Bassoon',
+                #       'Oboe', 'Pizzicato Strings'], "Orchestra"],
+                #     [['Electric Piano 2', 'Lead 5 (charang)', 'Electric Bass(pick)', 'Lead 2 (sawtooth)',
+                #       'Pad 1 (new age)', 'Orchestra Hit', 'Cello', 'Electric Guitar(clean)'], "Standard"],
+                #     [["Electric Guitar(clean)", "Electric Guitar(muted)", "Overdriven Guitar", "Distortion Guitar",
+                #       "Electric Bass(finger)"], "Standard"]
+                # ], [input_instruments, input_drum_kit])
             with gr.TabItem("midi prompt") as tab2:
                 input_midi = gr.File(label="input midi", file_types=[".midi", ".mid"], type="binary")
                 input_midi_events = gr.Slider(label="use first n midi events as prompt", minimum=1, maximum=512,

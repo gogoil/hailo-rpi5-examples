@@ -21,7 +21,7 @@ Usage
     - run `. setup_env.sh`
     - `cd community_projects/TEMPO`
     - `pip install -r requirements.txt`
-    - `sudo chmod 777 download_files`
+    - `sudo chmod 777 download_files.sh`
     - `./download_files.sh`
   
 2. Run the web application
