@@ -173,8 +173,8 @@ def finish_run(mid_seq):
     return *outputs, send_msgs(end_msgs)
 
 
-def synthesis_task(mid):
-    pcm = synthesizer.synthesis(MIDI.score2opus(mid))
+def synthesis_task(mid, is_first_batch):
+    pcm = synthesizer.synthesis(MIDI.score2opus(mid), is_first_batch)
     samples = np.empty((0, 2), dtype=np.int16)
     for i in range(0, len(pcm), 4):
         samples = np.concatenate([samples, np.array(struct.unpack('<hh', pcm[i:i+4]))])
@@ -191,7 +191,7 @@ def render_audio(mid_seq, should_render_audio):
     audio_futures = []
     for i in range(OUTPUT_BATCH_SIZE):
         mid = tokenizer.detokenize(mid_seq[i])
-        audio_future = thread_pool.submit(synthesis_task, mid)
+        audio_future = thread_pool.submit(synthesis_task, mid, is_first_batch)
         audio_futures.append(audio_future)
     for future in audio_futures:
         outputs.append((44100, future.result()))
