@@ -8,12 +8,13 @@ class MidiSynthesizer:
     def __init__(self, soundfont_path, sample_rate=44100):
         self.soundfont_path = soundfont_path
         self.sample_rate = sample_rate
-        fl = fluidsynth.Synth(samplerate=float(sample_rate))
-        sfid = fl.sfload(soundfont_path)
-        self.devices = [[fl, sfid, False]]
+        self.fl = fluidsynth.Synth(samplerate=float(sample_rate))
+        self.sfid = fl.sfload(soundfont_path)
+        self.devices = [[self.fl, self.sfid, False]]
         self.devices_lock = Lock()
         self.tempo = int((60 / 120) * 10 ** 6)  # default 120 bpm
         self.ticks_per_beat = 480
+        self.curr_device = None
 
     def get_fluidsynth(self):
         with self.devices_lock:
@@ -35,7 +36,8 @@ class MidiSynthesizer:
     def synthesis(self, midi_opus, is_first_batch):
         event_list = []
         if is_first_batch:
-            self.release_fluidsynth(self.curr_device)
+            if self.curr_device:
+                self.release_fluidsynth(self.curr_device)
             self.ticks_per_beat = midi_opus[0]
             midi_opus = midi_opus[1:]
 
@@ -57,13 +59,13 @@ class MidiSynthesizer:
         for event in event_list:
             name = event[0]
             sample_len = int(((event[1] / self.ticks_per_beat) * self.tempo / (10 ** 6)) * self.sample_rate)
-            sample_len -= int(((last_t / self.ticks_per_beat) * self.tempo / (10 ** 6)) * self.sample_rate)
-            last_t = event[1]
+            sample_len -= int(((self.last_t / self.ticks_per_beat) * self.tempo / (10 ** 6)) * self.sample_rate)
+            self.last_t = event[1]
             if sample_len > 0:
                 samples = self.fl.get_samples(sample_len).reshape(sample_len, 2)
                 pcm += b''.join([struct.pack('<hh', sample[0], sample[1]) for sample in samples])
             if name == "set_tempo":
-                tempo = event[2]
+                self.tempo = event[2]
             elif name == "patch_change":
                 c, p = event[2:4]
                 self.fl.program_select(c, self.sfid, 128 if c == 9 else 0, p)
