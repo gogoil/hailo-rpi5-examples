@@ -217,32 +217,22 @@ def undo_continuation(mid_seq, continuation_state):
     return mid_seq, continuation_state, send_msgs(end_msgs)
 
 
-def load_model(path):
+def load_model():
     global model, tokenizer
-    if path == "quantized_har":
-        base_emb = np.load('/fastdata/users/dorong/tmp/midi-model/model_base_embed_tokens.npy')
-        token_emb = np.load('/fastdata/users/dorong/tmp/midi-model/model_token_embed_tokens.npy')
-        from hailo_sdk_client.runner.client_runner import ClientRunner
-        from hailo_sdk_client.exposed_definitions import InferenceContext
-        runner_token = ClientRunner(har='/fastdata/users/dorong/tmp/midi-model/har/model_token.q.har')
-        with runner_token.infer_context(InferenceContext.SDK_QUANTIZED) as ctx:
-            model_token = runner_token.get_keras_model(ctx).model
-        runner_base = ClientRunner(har='/fastdata/users/dorong/tmp/midi-model/har/model_base.q.har')
-        with runner_base.infer_context(InferenceContext.SDK_QUANTIZED) as ctx:
-            model_base = runner_base.get_keras_model(ctx).model
-    if path == "hef":
-        base_emb = np.load('TEMPO_FILES/model_base_embed_tokens.npy')
-        token_emb = np.load('TEMPO_FILES/model_token_embed_tokens.npy')
-        model_token = "TEMPO_FILES/model_token.hef"
-        model_base = "TEMPO_FILES/model_base.hef"
-    model = MIDIModel(model_base, model_token, base_emb, token_emb)
-    tokenizer = model.tokenizer
-
+    model_path_dir = "TEMPO_FILES"
+    if not os.path.exists(model_path_dir):
+        return "Model not found. Make sure to run ./download_files.sh first."
+    try:
+        base_emb = os.path.join(model_path_dir, "model_base_embed_tokens.npy")
+        token_emb = os.path.join(model_path_dir, "model_token_embed_tokens.npy")
+        model_token = os.path.join(model_path_dir, "model_token.hef")
+        model_base = os.path.join(model_path_dir, "model_base.hef")
+        model = MIDIModel(model_base, model_token, base_emb, token_emb)
+        tokenizer = model.tokenizer
+    except Exception as e:
+        print(f"Failed to load model")
+        return e
     return "success"
-
-
-def get_model_path():
-    return gr.Dropdown(choices=["quantized_har", "hef"])
 
 
 def download(url, output_file):
@@ -323,13 +313,10 @@ if __name__ == "__main__":
                 }
                 """)
         with gr.Accordion(label="Model option", open=True):
-            load_model_path_btn = gr.Button("Get Models")
-            model_path_input = gr.Dropdown(label="model")
-            load_model_path_btn.click(get_model_path, [], model_path_input)
-            load_model_btn = gr.Button("Load")
+            load_model_btn = gr.Button("Load Model")
             model_msg = gr.Textbox()
             load_model_btn.click(
-                load_model, [model_path_input], model_msg
+                load_model, [], model_msg
             )
         tab_select = gr.State(value=0)
         with gr.Tabs():

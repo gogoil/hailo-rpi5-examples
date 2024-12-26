@@ -27,8 +27,8 @@ class MIDIModel:
         self.tokenizer = MIDITokenizer()
         self.tokenizer.set_optimise_midi()
 
-        self.net_emb = model_base_emb
-        self.net_token_emb = model_token_emb
+        self.net_emb = np.load(model_base_emb)
+        self.net_token_emb = np.load(model_token_emb)
         
         self._init_hefs(model_base, model_token)
 
