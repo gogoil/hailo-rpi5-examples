@@ -1,5 +1,6 @@
 import os
 import time
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import bpm_measurement
@@ -11,7 +12,7 @@ import tqdm
 import MIDI
 from midi_model import MIDIModel
 from midi_synthesizer import MidiSynthesizer
-from sound_stream import generate_wav, play_wav
+from sound_stream import generate_wav, worker, play_streams
 
 MAX_SEED = np.iinfo(np.int32).max
 OUTPUT_BATCH_SIZE = 1
@@ -209,19 +210,24 @@ def main():
     synthesizer = MidiSynthesizer("soundfont.sf2")
     thread_pool = ThreadPoolExecutor(max_workers=OUTPUT_BATCH_SIZE)
     model, tokenizer = load_model()
+    worker_thread = threading.Thread(target=worker)
+    player_thread = threading.Thread(target=play_streams)
+    worker_thread.start()
+    player_thread.start()
     
     continuation_state = [0]
     tab = 0
+    num_tokens = 128
     
     while True:
         bpm = bpm_measurement.get_bpm()
         instruments, drum_set = get_instruments(bpm)
-        output_midi_seq, continuation_state, input_seed = run(model, tokenizer, tab, None, continuation_state, 0, instruments, drum_set, bpm, "auto", 0, None, None,  None, None, None, None, None, True, 128, 1.0, 0.94, 20, True)
+        output_midi_seq, continuation_state, input_seed = run(model, tokenizer, tab, None, continuation_state, 0, instruments, drum_set, bpm, "auto", 0, None, None,  None, None, None, None, None, True, num_tokens, 1.0, 0.94, 20, True)
         midi_outputs = finish_run(output_midi_seq, tokenizer)
         audio_outputs = render_audio(output_midi_seq, True, tokenizer, thread_pool, synthesizer)
         tab = 0
         path = generate_wav(audio_outputs)
-        play_wav(path)
+        num_tokens = 16
 
 
 if __name__ == '__main__':

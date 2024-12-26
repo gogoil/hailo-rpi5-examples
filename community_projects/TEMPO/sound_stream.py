@@ -8,7 +8,8 @@ import os
 import time
 
 # Job queue to store WAV file paths
-job_queue = queue.Queue()
+max_queue_size = 100
+job_queue = queue.Queue(max_queue_size)
 
 WAV_DIR = "/tmp"
 
@@ -45,8 +46,13 @@ def play_streams():
             if file not in processed_files:
                 file_path = os.path.join(WAV_DIR, file)
                 print(f"Producer adding: {file_path}")
-                job_queue.put(file_path)
-                processed_files.add(file)
+                try:
+                    # Add the file path to the queue, waiting if it's full
+                    job_queue.put(file_path, block=True, timeout=2)
+                    processed_files.add(file)
+                except queue.Full:
+                    # Handle the case where the queue is full
+                    print("Queue is full, waiting to add file...")
 
         time.sleep(1)  # Wait a bit before checking again (to simulate real-time)
 
