@@ -354,20 +354,20 @@ if __name__ == "__main__":
                                          choices=["auto"] + key_signatures,
                                          type="index"
                                          )
-                # example1 = gr.Examples([
-                #     [[], "None"],
-                #     [["Acoustic Grand"], "None"],
-                #     [['Acoustic Grand', 'SynthStrings 2', 'SynthStrings 1', 'Pizzicato Strings',
-                #       'Pad 2 (warm)', 'Tremolo Strings', 'String Ensemble 1'], "Orchestra"],
-                #     [['Trumpet', 'Oboe', 'Trombone', 'String Ensemble 1', 'Clarinet',
-                #       'French Horn', 'Pad 4 (choir)', 'Bassoon', 'Flute'], "None"],
-                #     [['Flute', 'French Horn', 'Clarinet', 'String Ensemble 2', 'English Horn', 'Bassoon',
-                #       'Oboe', 'Pizzicato Strings'], "Orchestra"],
-                #     [['Electric Piano 2', 'Lead 5 (charang)', 'Electric Bass(pick)', 'Lead 2 (sawtooth)',
-                #       'Pad 1 (new age)', 'Orchestra Hit', 'Cello', 'Electric Guitar(clean)'], "Standard"],
-                #     [["Electric Guitar(clean)", "Electric Guitar(muted)", "Overdriven Guitar", "Distortion Guitar",
-                #       "Electric Bass(finger)"], "Standard"]
-                # ], [input_instruments, input_drum_kit])
+                example1 = gr.Examples([
+                    [[], "None"],
+                    # [["Acoustic Grand"], "None"],
+                    # [['Acoustic Grand', 'SynthStrings 2', 'SynthStrings 1', 'Pizzicato Strings',
+                    #   'Pad 2 (warm)', 'Tremolo Strings', 'String Ensemble 1'], "Orchestra"],
+                    # [['Trumpet', 'Oboe', 'Trombone', 'String Ensemble 1', 'Clarinet',
+                    #   'French Horn', 'Pad 4 (choir)', 'Bassoon', 'Flute'], "None"],
+                    # [['Flute', 'French Horn', 'Clarinet', 'String Ensemble 2', 'English Horn', 'Bassoon',
+                    #   'Oboe', 'Pizzicato Strings'], "Orchestra"],
+                    # [['Electric Piano 2', 'Lead 5 (charang)', 'Electric Bass(pick)', 'Lead 2 (sawtooth)',
+                    #   'Pad 1 (new age)', 'Orchestra Hit', 'Cello', 'Electric Guitar(clean)'], "Standard"],
+                    # [["Electric Guitar(clean)", "Electric Guitar(muted)", "Overdriven Guitar", "Distortion Guitar",
+                    #   "Electric Bass(finger)"], "Standard"]
+                ], [input_instruments, input_drum_kit])
             with gr.TabItem("midi prompt") as tab2:
                 input_midi = gr.File(label="input midi", file_types=[".midi", ".mid"], type="binary")
                 input_midi_events = gr.Slider(label="use first n midi events as prompt", minimum=1, maximum=512,
