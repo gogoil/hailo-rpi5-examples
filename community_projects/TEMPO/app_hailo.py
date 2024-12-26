@@ -10,6 +10,7 @@ from typing import Union, Optional
 import gradio as gr
 import numpy as np
 import requests
+import struct
 import tqdm
 
 import MIDI
@@ -130,10 +131,10 @@ def run(tab, mid_seq, continuation_state, continuation_select, instruments, drum
             init_msgs += [create_msg("visualizer_clear", [i, tokenizer.version]),
                           create_msg("visualizer_append", [i, events])]
     yield mid_seq, continuation_state, seed, send_msgs(init_msgs)
-    midi_generator = generate(mid, batch_size=OUTPUT_BATCH_SIZE, max_len=max_len, temp=temp,
-                              top_p=top_p, top_k=top_k, disable_patch_change=disable_patch_change,
-                              disable_control_change=not allow_cc, disable_channels=disable_channels,
-                              generator=generator)
+    midi_generator = model.generate(mid, batch_size=OUTPUT_BATCH_SIZE, max_len=max_len, temp=temp,
+                                    top_p=top_p, top_k=top_k, disable_patch_change=disable_patch_change,
+                                    disable_control_change=not allow_cc, disable_channels=disable_channels,
+                                    generator=generator)
     events = [list() for i in range(OUTPUT_BATCH_SIZE)]
     t = time.time()
     for i, token_seqs in enumerate(midi_generator):
@@ -173,7 +174,11 @@ def finish_run(mid_seq):
 
 
 def synthesis_task(mid):
-    return synthesizer.synthesis(MIDI.score2opus(mid))
+    pcm = synthesizer.synthesis(MIDI.score2opus(mid))
+    samples = np.empty((0, 2), dtype=np.int16)
+    for i in range(0, len(pcm), 4):
+        samples = np.concatenate([samples, np.array(struct.unpack('<hh', pcm[i:i+4]))])
+    return samples
 
 
 def render_audio(mid_seq, should_render_audio):
@@ -225,13 +230,19 @@ def load_model(path):
         runner_base = ClientRunner(har='/fastdata/users/dorong/tmp/midi-model/har/model_base.q.har')
         with runner_base.infer_context(InferenceContext.SDK_QUANTIZED) as ctx:
             model_base = runner_base.get_keras_model(ctx).model
-        model = MIDIModel(model_base, model_token, base_emb, token_emb)
-        tokenizer = model.tokenizer
+    if path == "hef":
+        base_emb = np.load('TEMPO_FILES/model_base_embed_tokens.npy')
+        token_emb = np.load('TEMPO_FILES/model_token_embed_tokens.npy')
+        model_token = "TEMPO_FILES/model_token.hef"
+        model_base = "TEMPO_FILES/model_base.hef"
+    model = MIDIModel(model_base, model_token, base_emb, token_emb)
+    tokenizer = model.tokenizer
+
     return "success"
 
 
 def get_model_path():
-    return gr.Dropdown(choices=["quantized_har"])
+    return gr.Dropdown(choices=["quantized_har", "hef"])
 
 
 def download(url, output_file):
