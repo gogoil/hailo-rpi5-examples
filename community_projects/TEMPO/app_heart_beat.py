@@ -195,7 +195,13 @@ def download_if_not_exit(url, output_file):
 
 
 def get_instruments(bpm):
-    return None
+    if bpm <= 80:
+        return ['Flute', 'French Horn', 'Clarinet', 'String Ensemble 2', 'English Horn', 'Bassoon', 'Oboe', 'Pizzicato Strings'], "Orchestra"
+    elif bpm <= 100:
+        return ['Acoustic Grand', 'SynthStrings 2', 'SynthStrings 1', 'Pizzicato Strings', 'Pad 2 (warm)', 'Tremolo Strings', 'String Ensemble 1'], "Orchestra"
+    elif bpm <= 120:
+        return ["Electric Guitar(clean)", "Electric Guitar(muted)", "Overdriven Guitar", "Distortion Guitar", "Electric Bass(finger)"], "Standard"
+    return ['Electric Piano 2', 'Lead 5 (charang)', 'Electric Bass(pick)', 'Lead 2 (sawtooth)', 'Pad 1 (new age)', 'Orchestra Hit', 'Cello', 'Electric Guitar(clean)'], "Standard"
 
 
 def main():
@@ -209,11 +215,11 @@ def main():
     
     while True:
         bpm = bpm_measurement.get_bpm()
-        instruments = get_instruments(bpm)
-        output_midi_seq, continuation_state, input_seed = run(model, tokenizer, tab, None, continuation_state, 0, instruments, "None", bpm, "auto", 0, None, None,  None, None, None, None, None, True, 64, 1.0, 0.94, 20, True)
+        instruments, drum_set = get_instruments(bpm)
+        output_midi_seq, continuation_state, input_seed = run(model, tokenizer, tab, None, continuation_state, 0, instruments, drum_set, bpm, "auto", 0, None, None,  None, None, None, None, None, True, 128, 1.0, 0.94, 20, True)
         midi_outputs = finish_run(output_midi_seq, tokenizer)
         audio_outputs = render_audio(output_midi_seq, True, tokenizer, thread_pool, synthesizer)
-        tab = 2
+        tab = 0
         path = generate_wav(audio_outputs)
         play_wav(path)
 
