@@ -36,7 +36,8 @@ class MidiSynthesizer:
     def synthesis(self, midi_opus, is_first_batch):
         event_list = []
         if is_first_batch:
-            self.release_fluidsynth(self.curr_device)
+            if self.curr_device:
+                self.release_fluidsynth(self.curr_device)
             self.ticks_per_beat = midi_opus[0]
             midi_opus = midi_opus[1:]
 
