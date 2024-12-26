@@ -10,7 +10,7 @@ The packages are described in the requirements (additionally to the requirements
 
 Run Options
 -----------
-You can run either with a heart monitor which will choose tge initial BPM in the generation or by choosing the generation manually. 
+You can run either with a heart monitor which will choose the initial BPM in the generation or by choosing the generation manually. 
 
 Setup
 -----
@@ -47,13 +47,12 @@ Running the program
 
 1. Run the web application(not using heart monitor):
     - run `python app_hailo.py --port 8080 --batch 1`
+    - After the web ui opens click "generate". This will load the hef file which is located in a google drive folder.
+    - In this version you can control all the sliders.
 
 2. Run using heart monitor:
-    - run 'python another_rt_app.py --port 8080 --batch 1'
-
-After the web ui opens click "generate". This will load the hef file which is located in a google drive folder. 
-When runnning the manual version you can control all the sliders.
-When running with the heart monitor, the BPM is determined by the hear monitor measured.
+    - run 'python app_heart_bit.py'
+    - When running with the heart monitor, the music is then generated and then is played. 
 
 Additional Notes
 ----------------
