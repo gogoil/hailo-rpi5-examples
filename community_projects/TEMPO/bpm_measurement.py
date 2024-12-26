@@ -6,10 +6,7 @@ from adafruit_ads1x15.analog_in import AnalogIn
 import numpy as np
 from scipy.signal import butter, filtfilt
 import matplotlib.pyplot as plt
-<<<<<<< HEAD
-from matplotlib.animation import FuncAnimation
-=======
->>>>>>> origin/main
+
 
 # Configuration parameters
 SAMPLE_RATE = 10   # Samples per second
@@ -80,7 +77,7 @@ def new_plot_data(data_1, data_2):
     ax2.tick_params(axis ='y', labelcolor = 'blue') 
     
     # Show plot
-    plt.show()
+    plt.show(block=False)
 
 
 def plot_data(data1, data2):
@@ -90,7 +87,7 @@ def plot_data(data1, data2):
     plt.title("Raw Signal from PulseSensor")
     plt.xlabel("Time (samples)")
     plt.ylabel("Voltage (V)")
-    plt.show(block=True)
+    plt.show(block=False)
     # anim = FuncAnimation(fig,update,frames=data)
     # plt.show(block=False)
 
@@ -142,7 +139,6 @@ def calc_median_bpm(bpm_vector):
     bpm_vec = np.array(bpm_vector)
     bpm_vec = bpm_vec[bpm_vec > 60]
     bpm_vec = bpm_vec[bpm_vec < 150]
-<<<<<<< HEAD
     median_bpm = np.median(bpm_vec)
     print(f'median bpm: {median_bpm}')
     return median_bpm
@@ -155,7 +151,7 @@ def plot_fft(frequencies, fft_magnitude):
     plt.xlabel("Frequency (Hz)")
     plt.ylabel("Magnitude")
     plt.grid(True)
-    plt.show()
+    plt.show(block=False)
 
 def caclulate_fft(data):
 # Compute the FFT of the signal
@@ -181,10 +177,7 @@ def caclulate_fft(data):
     calc_bpm = 60 * frequencies[max_magnitude_index]
     print(f'fft bpm: {calc_bpm}')
     return calc_bpm
-=======
-    return np.median(bpm_vec)
 
->>>>>>> origin/main
 
 def get_bpm():
     print("Starting Pulse Sensor BPM measurement...")
@@ -211,37 +204,15 @@ def get_bpm():
                     print(f"BPM: {bpm:.2f}")
                     start_time = time.time()
 
-<<<<<<< HEAD
-            # return the average bpm
-=======
-
->>>>>>> origin/main
             if len(plot_data_vec) == SAMPLE_RATE * 20:
                 # Plot the data periodically (e.g., every second)
                 new_plot_data(plot_data_vec, plot_bpm_vec)  # Plot the raw data over the past second
                 median_bpm = calc_median_bpm(plot_bpm_vec)
-<<<<<<< HEAD
                 fft_bpm = caclulate_fft(plot_data_vec)
                 if (140 > fft_bpm > 60):
                     print('bpm is based on fft')
                     return fft_bpm
                 print('bpm is based on median time between peaks')
-=======
-                print(f'median bpm: {median_bpm}')
-                # Compute the FFT of the signal
-                plot_data_vec = np.array(plot_data_vec)
-                plot_data_vec = plot_data_vec - np.mean(plot_data_vec)
-                fft_signal = np.fft.fft(plot_data_vec)
-                frequencies = np.fft.fftfreq(len(plot_data_vec), 1/SAMPLE_RATE)
-                fft_magnitude = np.abs(fft_signal)[:len(plot_data_vec)//2]
-                max_magnitude_index = 6
-                for i in range(6, 20):
-                    if (fft_magnitude[max_magnitude_index] < fft_magnitude[i]):
-                        max_magnitude_index = i
-                calc_bpm = 60 / frequencies[i]
-                print(f'frequency: {calc_bpm}')
-                #break
->>>>>>> origin/main
                 return median_bpm
 
             # Small delay to match sample rate
