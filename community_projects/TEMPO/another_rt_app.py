@@ -337,9 +337,9 @@ if __name__ == "__main__":
         tab_select = gr.State(value=0)
         with gr.Tabs():
             with gr.TabItem("custom prompt") as tab1:
-                input_instruments = gr.Dropdown(label="🪗instruments (auto)", choices=list(),
+                input_instruments = gr.Dropdown(label="🪗instruments (auto if empty)", choices=list(patch2number.keys()),
                                                 multiselect=True, max_choices=15, type="value")
-                input_drum_kit = gr.Dropdown(label="🥁drum kit (auto)", choices=list(), type="value",
+                input_drum_kit = gr.Dropdown(label="🥁drum kit", choices=list(drum_kits2number.keys()), type="value",
                                              value="None")
                 input_bpm = gr.Slider(label="BPM (beats are overridden by sensor)", minimum=0, maximum=255,
                                       step=1,
@@ -356,17 +356,17 @@ if __name__ == "__main__":
                                          )
                 example1 = gr.Examples([
                     [[], "None"],
-                    # [["Acoustic Grand"], "None"],
-                    # [['Acoustic Grand', 'SynthStrings 2', 'SynthStrings 1', 'Pizzicato Strings',
-                    #   'Pad 2 (warm)', 'Tremolo Strings', 'String Ensemble 1'], "Orchestra"],
-                    # [['Trumpet', 'Oboe', 'Trombone', 'String Ensemble 1', 'Clarinet',
-                    #   'French Horn', 'Pad 4 (choir)', 'Bassoon', 'Flute'], "None"],
-                    # [['Flute', 'French Horn', 'Clarinet', 'String Ensemble 2', 'English Horn', 'Bassoon',
-                    #   'Oboe', 'Pizzicato Strings'], "Orchestra"],
-                    # [['Electric Piano 2', 'Lead 5 (charang)', 'Electric Bass(pick)', 'Lead 2 (sawtooth)',
-                    #   'Pad 1 (new age)', 'Orchestra Hit', 'Cello', 'Electric Guitar(clean)'], "Standard"],
-                    # [["Electric Guitar(clean)", "Electric Guitar(muted)", "Overdriven Guitar", "Distortion Guitar",
-                    #   "Electric Bass(finger)"], "Standard"]
+                    [["Acoustic Grand"], "None"],
+                    [['Acoustic Grand', 'SynthStrings 2', 'SynthStrings 1', 'Pizzicato Strings',
+                      'Pad 2 (warm)', 'Tremolo Strings', 'String Ensemble 1'], "Orchestra"],
+                    [['Trumpet', 'Oboe', 'Trombone', 'String Ensemble 1', 'Clarinet',
+                      'French Horn', 'Pad 4 (choir)', 'Bassoon', 'Flute'], "None"],
+                    [['Flute', 'French Horn', 'Clarinet', 'String Ensemble 2', 'English Horn', 'Bassoon',
+                      'Oboe', 'Pizzicato Strings'], "Orchestra"],
+                    [['Electric Piano 2', 'Lead 5 (charang)', 'Electric Bass(pick)', 'Lead 2 (sawtooth)',
+                      'Pad 1 (new age)', 'Orchestra Hit', 'Cello', 'Electric Guitar(clean)'], "Standard"],
+                    [["Electric Guitar(clean)", "Electric Guitar(muted)", "Overdriven Guitar", "Distortion Guitar",
+                      "Electric Bass(finger)"], "Standard"]
                 ], [input_instruments, input_drum_kit])
             with gr.TabItem("midi prompt") as tab2:
                 input_midi = gr.File(label="input midi", file_types=[".midi", ".mid"], type="binary")
