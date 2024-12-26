@@ -6,7 +6,6 @@ from adafruit_ads1x15.analog_in import AnalogIn
 import numpy as np
 from scipy.signal import butter, filtfilt
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
 
 # Configuration parameters
 SAMPLE_RATE = 10   # Samples per second
