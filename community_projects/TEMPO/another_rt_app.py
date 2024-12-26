@@ -22,32 +22,6 @@ from midi_tokenizer import MIDITokenizerV1, MIDITokenizerV2
 
 MAX_SEED = np.iinfo(np.int32).max
 
-def run_subprocess():
-    # Start the subprocess, calling the bpm_measurement.py script's main function
-    process = subprocess.Popen(
-        ["python", "-c", "import bpm_measurement; print(bpm_measurement.main())"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True  # Ensures output is returned as strings
-    )
-    return process
-
-def check_subprocess(process):
-    # Poll the subprocess to check its status
-    return_code = process.poll()
-    if return_code is not None:
-        # The process has finished
-        stdout, stderr = process.communicate()
-        print(f"Subprocess finished with return code {return_code}")
-        print(f"stdout: {stdout}")
-        print(f"stderr: {stderr}")
-        # Parse and return the result from stdout
-        return stdout.strip()  # Assuming the result is on a single line
-    else:
-        # The process is still running
-        print("Subprocess is still running")
-        return None
-
 
 def generate(prompt=None, batch_size=1, max_len=512, temp=1.0, top_p=0.98, top_k=20,
              disable_patch_change=False, disable_control_change=False, disable_channels=None, generator=None):
@@ -74,12 +48,22 @@ def send_msgs(msgs):
     return json.dumps(msgs)
 
 
+def get_instruments(bpm):
+    if bpm <= 80:
+        return None, "None"
+    elif bpm <= 100:
+        return ['Acoustic Grand', 'SynthStrings 2', 'SynthStrings 1', 'Pizzicato Strings', 'Pad 2 (warm)', 'Tremolo Strings', 'String Ensemble 1'], "Orchestra"
+    elif bpm <= 120:
+        return None, "None"
+    return None, "None"
+
 def run(tab, mid_seq, continuation_state, continuation_select, instruments, drum_kit, bpm, time_sig, key_sig, mid,
         midi_events,  reduce_cc_st, remap_track_channel, add_default_instr, remove_empty_channels, seed, seed_rand,
         gen_events, temp, top_p, top_k, allow_cc):
     bpm = bpm_measurement.get_bpm()
     print(f"bpm was recived {bpm}")
     bpm = int(bpm)
+    instruments2, drum_kit2 = get_instruments(bpm)
     if time_sig == "auto":
         time_sig = None
         time_sig_nn = 4
@@ -115,18 +99,18 @@ def run(tab, mid_seq, continuation_state, continuation_select, instruments, drum
         if bpm != 0:
             mid.append(tokenizer.event2tokens(["set_tempo", 0, 0, 0, bpm]))
         patches = {}
-        if instruments is None:
-            instruments = []
-        for instr in instruments:
+        if instruments2 is None:
+            instruments2 = []
+        for instr in instruments2:
             patches[i] = patch2number[instr]
             i = (i + 1) if i != 8 else 10
-        if drum_kit != "None":
-            patches[9] = drum_kits2number[drum_kit]
+        if drum_kit2 != "None":
+            patches[9] = drum_kits2number[drum_kit2]
         for i, (c, p) in enumerate(patches.items()):
             mid.append(tokenizer.event2tokens(["patch_change", 0, 0, i + 1, c, p]))
         mid = np.asarray([mid] * OUTPUT_BATCH_SIZE, dtype=np.int64)
         mid_seq = mid.tolist()
-        if len(instruments) > 0:
+        if len(instruments2) > 0:
             disable_patch_change = True
             disable_channels = [i for i in range(16) if i not in patches]
     elif tab == 1 and mid is not None:
@@ -357,9 +341,9 @@ if __name__ == "__main__":
                                                 multiselect=True, max_choices=15, type="value")
                 input_drum_kit = gr.Dropdown(label="🥁drum kit", choices=list(drum_kits2number.keys()), type="value",
                                              value="None")
-                # input_bpm = gr.Slider(label="BPM (beats are overridden by sensor)", minimum=0, maximum=255,
-                #                       step=1,
-                #                       value=0)
+                input_bpm = gr.Slider(label="BPM (beats are overridden by sensor)", minimum=0, maximum=255,
+                                      step=1,
+                                      value=0)
                 input_time_sig = gr.Radio(label="time signature (only for tv2 models)",
                                           value="auto",
                                           choices=["auto", "4/4", "2/4", "3/4", "6/4", "7/4",

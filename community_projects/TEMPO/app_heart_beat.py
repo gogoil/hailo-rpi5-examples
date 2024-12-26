@@ -102,21 +102,16 @@ def run(model, tokenizer, tab, mid_seq, continuation_state, continuation_select,
     if mid is not None:
         max_len += mid.shape[1]
 
-    yield mid_seq, continuation_state, seed
     midi_generator = model.generate(mid, batch_size=OUTPUT_BATCH_SIZE, max_len=max_len, temp=temp,
                                     top_p=top_p, top_k=top_k, disable_patch_change=disable_patch_change,
                                     disable_control_change=not allow_cc, disable_channels=disable_channels,
                                     generator=generator)
-    t = time.time()
     for i, token_seqs in enumerate(midi_generator):
         token_seqs = token_seqs.tolist()
         for j in range(OUTPUT_BATCH_SIZE):
             token_seq = token_seqs[j]
             mid_seq[j].append(token_seq)
-        if time.time() - t > 0.2:
-            yield mid_seq, continuation_state, seed
-            t = time.time()
-    yield mid_seq, continuation_state, seed
+    return mid_seq, continuation_state, seed
 
 
 def finish_run(mid_seq, tokenizer):
