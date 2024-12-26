@@ -6,12 +6,14 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Union, Optional
-
+import bpm_measurement
 import gradio as gr
 import numpy as np
 import requests
 import struct
 import tqdm
+import subprocess
+import time
 
 import MIDI
 from midi_model import MIDIModel
@@ -21,11 +23,12 @@ from midi_tokenizer import MIDITokenizerV1, MIDITokenizerV2
 MAX_SEED = np.iinfo(np.int32).max
 
 def run_subprocess():
-    # Start the subprocess
+    # Start the subprocess, calling the bpm_measurement.py script's main function
     process = subprocess.Popen(
-        ["python", "-c", "import bpm_measurement; bpm_measurement.get_bpm()"],
+        ["python", "-c", "import bpm_measurement; print(bpm_measurement.main())"],
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
+        stderr=subprocess.PIPE,
+        text=True  # Ensures output is returned as strings
     )
     return process
 
@@ -36,9 +39,10 @@ def check_subprocess(process):
         # The process has finished
         stdout, stderr = process.communicate()
         print(f"Subprocess finished with return code {return_code}")
-        print(f"stdout: {stdout.decode()}")
-        print(f"stderr: {stderr.decode()}")
-        return stdout.decode()
+        print(f"stdout: {stdout}")
+        print(f"stderr: {stderr}")
+        # Parse and return the result from stdout
+        return stdout.strip()  # Assuming the result is on a single line
     else:
         # The process is still running
         print("Subprocess is still running")
@@ -73,6 +77,8 @@ def send_msgs(msgs):
 def run(tab, mid_seq, continuation_state, continuation_select, instruments, drum_kit, bpm, time_sig, key_sig, mid,
         midi_events,  reduce_cc_st, remap_track_channel, add_default_instr, remove_empty_channels, seed, seed_rand,
         gen_events, temp, top_p, top_k, allow_cc):
+    bpm = bpm_measurement.get_bpm()
+    print(f"bpm was recived {bpm}")
     bpm = int(bpm)
     if time_sig == "auto":
         time_sig = None
@@ -97,6 +103,7 @@ def run(tab, mid_seq, continuation_state, continuation_select, instruments, drum
     generator = np.random.default_rng(seed)
     disable_patch_change = False
     disable_channels = None
+    print(f"tab {tab}")
     if tab == 0:
         i = 0
         mid = [[tokenizer.bos_id] + [tokenizer.pad_id] * (tokenizer.max_token_seq - 1)]
@@ -312,6 +319,7 @@ key_signatures = ['C♭', 'A♭m', 'G♭', 'E♭m', 'D♭', 'B♭m', 'A♭', 'Fm
                   'C', 'Am', 'G', 'Em', 'D', 'Bm', 'A', 'F♯m', 'E', 'C♯m', 'B', 'G♯m', 'F♯', 'D♯m', 'C♯', 'A♯m']
 
 if __name__ == "__main__":
+    # bpm_subprocess = run_subprocess()
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=7860, help="gradio server port")
     parser.add_argument("--batch", type=int, default=4, help="batch size")
@@ -349,9 +357,9 @@ if __name__ == "__main__":
                                                 multiselect=True, max_choices=15, type="value")
                 input_drum_kit = gr.Dropdown(label="🥁drum kit", choices=list(drum_kits2number.keys()), type="value",
                                              value="None")
-                input_bpm = gr.Slider(label="BPM (beats per minute, auto if 0)", minimum=0, maximum=255,
-                                      step=1,
-                                      value=0)
+                # input_bpm = gr.Slider(label="BPM (beats are overridden by sensor)", minimum=0, maximum=255,
+                #                       step=1,
+                #                       value=0)
                 input_time_sig = gr.Radio(label="time signature (only for tv2 models)",
                                           value="auto",
                                           choices=["auto", "4/4", "2/4", "3/4", "6/4", "7/4",
@@ -425,6 +433,7 @@ if __name__ == "__main__":
                     output_midi = gr.File(label="output midi", file_types=[".mid"])
                     midi_outputs.append(output_midi)
                     audio_outputs.append(output_audio)
+        input_bpm = 0
         run_event = run_btn.click(run, [tab_select, output_midi_seq, output_continuation_state,
                                         input_continuation_select, input_instruments, input_drum_kit, input_bpm,
                                         input_time_sig, input_key_sig, input_midi, input_midi_events,
